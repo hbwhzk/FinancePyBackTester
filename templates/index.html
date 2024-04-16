@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Quantitative Backtesting System</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/index.css') }}">
+</head>
+<body>
+    <h1>Quantitative Backtesting System</h1>
+    <form action="/backtest" method="post" enctype="multipart/form-data">
+
+        <label for="data_source">Data Source Type:</label>
+        <select id="data_source" name="data_source" onchange="toggleDataSourceOptions()">
+            <option value="">Select Data Source</option>
+            <option value="online">Yahoo Finance</option>
+            <option value="a_stock">A-share Market</option>
+        </select><br><br>
+
+
+        <div id="online_resource" class="data_source_option" style="display: none;">
+            <label for="symbol">Enter Stock Symbol, e.g., Apple: AAPL, Google: GOOG, or Bitcoin: BTC-USD</label>
+            <input type="text" id="symbol" name="symbol"><br><br>
+        </div>
+
+
+        <div id="a_stock_resource" class="data_source_option" style="display: none;">
+            <label for="symbol_a">Stock Symbol, e.g., Vanke A: SZ000002, Kweichow Moutai: SH600519, CATL: SZ300750, note the uppercase prefix</label>
+            <input type="text" id="symbol_a" name="symbol_a"><br><br>
+        </div>
+
+
+        <label for="start_date">Select Start Date:</label>
+        <input type="date" id="start_date" name="start_date" required><br><br>
+
+
+        <label for="end_date">Select End Date:</label>
+        <input type="date" id="end_date" name="end_date" required><br><br>
+
+
+        <label for="initial_cash">Initial Capital (Currency Unit):</label>
+        <input type="number" id="initial_cash" name="initial_cash" min="1000" step="100" value="100000"><br><br>
+
+
+        <label for="trade_size">Unit Size per Trade, default is 1, can be used as a fixed trade amount</label>
+        <input type="number" id="trade_size" name="trade_size" min="1" value="1"><br><br>
+
+        <label for="commission_rate">Commission %, default is 0.05% means five ten-thousandths </label>
+        <input type="number" id="commission_rate" name="commission_rate" min="0" step="0.001" value="0.05"><br><br>        
+        
+
+        <label for="strategy">Basic Strategy:</label>
+        <select id="strategy" name="strategy">
+            <option value="moving_average">Moving Average Crossover</option>
+            <option value="rsi">RSI Overbought/Oversold</option>
+
+        </select><br><br>
+
+
+        <div id="rsi_params" class="strategy_params" style="display: none;">
+            <label for="rsi_period">RSI Period:</label>
+            <input type="number" id="rsi_period" name="rsi_period" value="14"><br><br>
+        
+            <label for="rsi_upper">RSI Upper Threshold:</label>
+            <input type="number" id="rsi_upper" name="rsi_upper" value="70"><br><br>
+        
+            <label for="rsi_lower">RSI Lower Threshold:</label>
+            <input type="number" id="rsi_lower" name="rsi_lower" value="30"><br><br>
+        </div>
+
+        <input type="submit" value="Start Backtest">
+    </form>
+
+    {% for message in get_flashed_messages() %}
+        <div>{{ message }}</div>
+    {% endfor %}
+
+    {% if fig_path %}
+    <div>
+        <img src="{{ url_for('static', filename=fig_path) }}" alt="Backtest Result">
+    </div>
+    {% endif %}
+    
+    <script src="{{ url_for('static', filename='js/index.js') }}"></script>
+</body>
+</html>
