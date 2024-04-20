@@ -1,71 +1,90 @@
-import os
-import logging
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template
 import backtrader as bt
-from strategies.basic_strategy import BasicStrategy
-from strategies.load_data_yf import fetch_data_from_yahoo
-from strategies.load_data_a_stock import fetch_a_stock_data
-import pandas as pd
-import matplotlib.pyplot as plt
-from datetime import datetime
+from strategies.get_a_stock import get_a_stock
+from strategies.rsi import RSIStrategy
+from strategies.sma import SMACrossStrategy
+from datetime import datetime, timedelta
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key'
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    end_date = datetime.now() - timedelta(days=1)  
+    start_date = end_date - timedelta(days=365)  
+    end_date_str = end_date.strftime('%Y-%m-%d')
+    start_date_str = start_date.strftime('%Y-%m-%d')
+    return render_template('index.html', start_date=start_date_str, end_date=end_date_str)
 
-@app.route('/backtest', methods=['POST'])
-def backtest():
-    logging.debug("Starting backtest function")
+
+@app.route('/results', methods=['GET'])
+def results():
+    symbol = request.args.get('symbol')
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
+    strategy_name = request.args.get('strategy')
+    param1 = int(request.args.get('param1', 14))  
+    param2_str = request.args.get('param2', '30')  
     try:
-        data_source = request.form['data_source']
-        symbol = request.form['symbol'] if data_source == 'online' else request.form.get('symbol_a', '')
-        start_date = request.form['start_date']
-        end_date = request.form['end_date']
-        initial_cash = float(request.form['initial_cash'])
-        commission_rate = float(request.form['commission_rate']) / 100
+        param2 = int(param2_str) if param2_str.isdigit() else None
+    except ValueError:
+        param2 = None  
 
-        logging.info(f"Form data received: data_source={data_source}, symbol={symbol}, start_date={start_date}, end_date={end_date}, initial_cash={initial_cash}")
+    cerebro = bt.Cerebro()
+    start_cash = float(request.args.get('initial_cash', 100000))
 
-        cerebro = bt.Cerebro()
-        cerebro.addstrategy(BasicStrategy)
-        cerebro.broker.setcash(initial_cash)
-        cerebro.broker.setcommission(commission=commission_rate)
-        
-        if data_source == 'online':
-            df = fetch_data_from_yahoo(symbol, start_date, end_date)
-        elif data_source == 'a_stock':
-            days = (datetime.strptime(end_date, '%Y-%m-%d') - datetime.strptime(start_date, '%Y-%m-%d')).days
-            df = fetch_a_stock_data(symbol, start_date, days)
+    cerebro.broker.set_cash(start_cash)
 
-        if df is not None and not df.empty:
-            if not isinstance(df.index, pd.DatetimeIndex):
-                logging.error("Data index is not a DatetimeIndex.")
-                flash("Data format error: Index is not a DatetimeIndex.")
-                return redirect(url_for('index'))
-            data = bt.feeds.PandasData(dataname=df)
-            cerebro.adddata(data)
-            cerebro.run()
-            fig_path = 'backtest_result.png'
-            fig = cerebro.plot()[0][0]
-            fig.savefig(os.path.join(app.static_folder, fig_path))  
-            plt.close(fig)
+    data, success = get_a_stock(symbol, start_date, end_date)  
+    print("Data retrieval success:", success)
+    if not success:
+        return "Failed to fetch data for the provided dates.", 500
 
-            logging.info("Backtest completed successfully")
-            flash('Backtest completed successfully.')
-            return render_template('index.html', fig_path=fig_path)
+    cerebro.adddata(data)
 
+    if strategy_name == 'RSI':
+        cerebro.addstrategy(RSIStrategy, period=param1)
+    elif strategy_name == 'MovingAverageCross' and param2 is not None:
+        cerebro.addstrategy(SMACrossStrategy, short_period=param1, long_period=param2)
+
+    cerebro.tradehistory = True  
+
+    strategies = cerebro.run()
+    if strategies:
+        strategy = strategies[0]  
+        if hasattr(strategy, 'get_trade_data'):
+            trade_data = strategy.get_trade_data()  
+            print("get trade_data:", trade_data)
         else:
-            logging.error("Data loading failed or data is empty.")
-            flash('Failed to fetch or process data.')
-            return redirect(url_for('index'))
+            print("no trade_data")
+            trade_data = []
+    else:
+        print("no results")
+        trade_data = []
 
-    except Exception as e:
-        logging.error(f"Error in backtest function: {e}", exc_info=True)
-        flash(f'An error occurred during backtesting: {str(e)}')
-        return redirect(url_for('index'))
+    final_value = cerebro.broker.getvalue()
+    candlestick_data = get_candlestick_data(data)
+
+    return render_template('results.html', initial_cash=start_cash, final_value=final_value, 
+                           results={'candlesticks': candlestick_data, 'trades': trade_data})
+
+
+def get_candlestick_data(datafeed):
+    ohlc = []
+    for i in range(len(datafeed)):
+        date = datafeed.datetime.array[i]
+        o = datafeed.open.array[i]
+        h = datafeed.high.array[i] 
+        l = datafeed.low.array[i]
+        c = datafeed.close.array[i]
+        ohlc.append({
+            't': bt.num2date(date).strftime('%Y-%m-%d'),
+            'o': o,
+            'h': h,
+            'l': l,
+            'c': c
+        })
+    return ohlc
 
 if __name__ == '__main__':
     app.run(debug=True)
+
