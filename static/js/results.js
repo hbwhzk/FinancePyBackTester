@@ -1,152 +1,211 @@
-var chart;
-
-
-document.addEventListener('DOMContentLoaded', function () {
-    console.log("DOMContentLoaded event fired");
-    var ctx = document.getElementById('chart').getContext('2d');
-    
-    if (!ctx) {
-        console.error("Failed to get canvas context");
-        return;
-    }
-
-    if (!candlestickData || candlestickData.length === 0) {
-        console.error("No data available for the chart");
-        return;
-    }
-
-    
-    var formattedData = candlestickData.map(item => {
-        let dateObject = luxon.DateTime.fromISO(item.t); 
+document.addEventListener('DOMContentLoaded', () => {
+    const candlestickDataFormatted = candlestickData.map(item => {
+        if (!item || typeof item.t === 'undefined' || typeof item.o === 'undefined') {
+            console.error('Invalid item encountered:', item);
+            return null;
+        }
         return {
-            x: dateObject.valueOf(), 
-            o: parseFloat(item.o),
-            h: parseFloat(item.h),
-            l: parseFloat(item.l),
-            c: parseFloat(item.c),
+            x: new Date(luxon.DateTime.fromISO(item.t).valueOf()),
+            y: [item.o, item.h, item.l, item.c]
         };
-    });
+    }).filter(item => item !== null);
+
+    const lineData = candlestickData.map(item => ({ 
+        x: new Date(luxon.DateTime.fromISO(item.t).valueOf()), 
+        y: item.c 
+    }));
+
+    const volumeDataFormatted = candlestickData.map(item => ({
+        x: new Date(luxon.DateTime.fromISO(item.t).valueOf()),
+        y: item.v
+    }));
     
 
-    var lineData = formattedData.map(item => {
-        return { x: item.x, y: item.c }; 
-    });
+    const buyPointsFormatted = tradeData.filter(trade => trade.type === 'buy').map(trade => {
+        if (!trade.date || !trade.price) {
+            console.error('Invalid trade data:', trade);
+            return null;
+        }
+        return {
+            x: new Date(luxon.DateTime.fromISO(trade.date).valueOf()),
+            y: trade.price
+        };
+    }).filter(item => item !== null);
 
-    var buyPoints = tradeData.filter(trade => trade.type === 'buy').map(trade => {
-        let dateObject = luxon.DateTime.fromISO(trade.date);
-        return { x: dateObject.valueOf(), y: trade.price };
-    });
+    const sellPointsFormatted = tradeData.filter(trade => trade.type === 'sell').map(trade => {
+        return {
+            x: new Date(luxon.DateTime.fromISO(trade.date).valueOf()),
+            y: trade.price
+        };
+    }).filter(item => item !== null);
 
-    var sellPoints = tradeData.filter(trade => trade.type === 'sell').map(trade => {
-        let dateObject = luxon.DateTime.fromISO(trade.date);
-        return { x: dateObject.valueOf(), y: trade.price };
-    });
-
-    console.log("Formatted Data:", formattedData);
-    console.log("Line Data:", lineData);
-    console.log("Buy Points:", buyPoints);
-    console.log("Sell Points:", sellPoints);
-    
-    chart = new Chart(ctx, {
-        type: 'candlestick',
-        data: {
-            datasets: [
-                {
-                    label: 'Candlestick',
-                    data: formattedData,
-                    hidden: true,
+    var candlestickChart = new ApexCharts(document.querySelector("#candlestick-chart"), {
+        series: [
+            {
+                name: 'Candlestick',
+                type: 'candlestick',
+                data: candlestickDataFormatted
+            },
+            {
+                name: 'Close Price',
+                type: 'line',
+                data: lineData
+            }
+        ],
+        chart: {
+            height: 350,
+            type: 'candlestick',
+            id: 'candlestickChart',
+            toolbar: {
+                show: true,
+                tools: {
+                    download: true,
+                    selection: true,
+                    zoom: false,
+                    zoomin: false,
+                    zoomout: false,
+                    pan: true,
+                    reset: true
                 },
-                {
-                    label: "Close Price",
-                    type: "line",
-                    data: lineData,
-                    borderColor: "rgba(0, 0, 0, 0.65)",
-                    backgroundColor: "rgba(0, 0, 0, 0.2)",
-                    fill: false,
-                    hidden: false,
+                autoSelected: 'zoom'
+            },
+            events: {
+                mounted: function(chartContext, config) {
+                    console.log("Chart has been successfully mounted.");
                 },
-                {
-                    label: 'Buy Points',
-                    type: 'scatter',
-                    data: buyPoints,
-                    pointStyle: 'triangle',
-                    borderColor: "rgba(0, 255, 0, 1)",
-                    backgroundColor: "rgba(0, 255, 0, 1)",
-                    showLine: false,
-                    pointRadius: 8
+                zoomed: function(chartContext, {xaxis, yaxis}) {
+                    console.log("Zoom event triggered.");
+                    updateYAxisBounds(chartContext, xaxis);
                 },
-                {
-                    label: 'Sell Points',
-                    type: 'scatter',
-                    data: sellPoints,
-                    pointStyle: 'triangle',
-                    backgroundColor: "rgba(255, 0, 0, 1)",
-                    borderColor: "rgba(255, 0, 0, 1)",
-                    showLine: false,
-                    pointRadius: 8
+                scrolled: function(chartContext, {xaxis, yaxis}) {
+                    console.log("Scroll event triggered.");
+                    updateYAxisBounds(chartContext, xaxis);
                 }
-            ]
+            }
         },
-        options: {
-            scales: {
-                x: {
-                    type: 'time', 
-                    time: {
-                        unit: 'day'
+        xaxis: {
+            type: 'datetime'
+        },
+        yaxis: {
+            title: {
+                text: 'Price'
+            }
+        },
+        annotations: {
+            xaxis: [
+                ...buyPointsFormatted.map(point => ({
+                    x: new Date(point.x).getTime(),
+                    borderColor: '#FF0000',
+                    label: {
+                        borderColor: '#FF0000',
+                        style: {
+                            fontSize: '12px',
+                            color: '#fff',
+                            background: '#FF0000'
+                        },
+                        orientation: 'horizontal',
+                        text: 'Buy'
                     }
-                },
-                y: {
-                    type: 'linear'
+                })),
+                ...sellPointsFormatted.map(point => ({
+                    x: new Date(point.x).getTime(),
+                    borderColor: '#00FF00',
+                    label: {
+                        borderColor: '#00FF00',
+                        style: {
+                            fontSize: '12px',
+                            color: '#fff',
+                            background: '#00FF00'
+                        },
+                        orientation: 'horizontal',
+                        text: 'Sell'
+                    }
+                }))
+            ]
+        }
+    });
+
+    var volumeChart = new ApexCharts(document.querySelector("#volume-chart"), {
+        series: [
+            {
+                name: 'Volume',
+                type: 'bar',
+                data: volumeDataFormatted
+            }
+        ],
+        chart: {
+            height: 200,
+            type: 'bar',
+            id: 'volumeChart',
+            brush: {
+                enabled: true,
+                target: 'candlestickChart'
+            },
+            selection: {
+                enabled: true,
+                xaxis: {
+                    min: new Date().getTime() - (30 * 24 * 60 * 60 * 1000),
+                    max: new Date().getTime()
                 }
             },
-            plugins: {
-                zoom: {
-                    zoom: {
-                        wheel: {
-                            enabled: true, 
-                            mode: 'x'      
-                        },
-                        pinch: {
-                            enabled: true, 
-                            mode: 'x'
-                        },
-                        mode: 'x'
-                    },
-                    pan: {
-                        enabled: true, 
-                        mode: 'x'
+            events: {
+                selection: function(chartContext, { xaxis }) {
+                    console.log("Volume chart selection event triggered.");
+                    
+                    // 调用函数来更新 candlestickChart
+                    if (candlestickChart && xaxis && xaxis.min && xaxis.max) {
+                        updateYAxisBounds(candlestickChart, xaxis);
                     }
                 }
             }
+        },
+        xaxis: {
+            type: 'datetime',
+            tickPlacement: 'on'
+        },
+        yaxis: {
+            title: {
+                text: 'Volume'
+            },
+            opposite: true
         }
     });
 
-    if (!chart) {
-        console.error("Failed to create chart.");
-    }
+    candlestickChart.render();
+    volumeChart.render();
 
-    
-    function update() {
-        var colorScheme = document.getElementById('color-scheme').value;
-        if (colorScheme === 'neon') {
-            chart.config.data.datasets[0].backgroundColors = {
-                up: '#fe0000', 
-                down: '#01ff01',
-                unchanged: '#999'
-            };
-            chart.config.data.datasets[0].borderColors = {
-                up: '#fe0000',
-                down: '#01ff01',
-                unchanged: '#999'
-            };
-        } else {
-            delete chart.config.data.datasets[0].backgroundColors;
-            delete chart.config.data.datasets[0].borderColors;
+    function updateYAxisBounds(candlestickChart, xaxis) {
+        if (!xaxis || typeof xaxis.min === 'undefined' || typeof xaxis.max === 'undefined') {
+            console.error("xaxis data is missing.");
+            return;
         }
-        chart.update();
+    
+        let newData = candlestickDataFormatted.filter(d => {
+            return new Date(d.x).getTime() >= xaxis.min && new Date(d.x).getTime() <= xaxis.max;
+        });
+    
+        let newMinPrice = Math.min(...newData.map(d => d.y[2]));
+        let newMaxPrice = Math.max(...newData.map(d => d.y[1]));
+
+        
+        newMinPrice *= 0.99; //  -2%
+        newMaxPrice *= 1.01; // +2%
+    
+        candlestickChart.updateOptions({
+            yaxis: {
+                min: newMinPrice,
+                max: newMaxPrice
+            },
+            xaxis: {
+                min: xaxis.min,
+                max: xaxis.max
+            }
+        }, false, true);
     }
     
-    document.getElementById('color-scheme').addEventListener('change', update);
+    
+
+
     
 });
 

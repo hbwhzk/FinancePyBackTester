@@ -36,14 +36,7 @@ def get_a_stock(symbol, start_date, end_date):
 
 
 
-# Example usage
-# symbol = 'SZ000002'
-# start_date = '2023-10-01'
-# end_date = '2024-10-10'
 
-# # 获取数据
-# data = get_a_stock(symbol, start_date, end_date)
-# print(data)
 
 
 

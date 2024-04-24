@@ -11,6 +11,8 @@ app = Flask(__name__)
 def index():
     end_date = datetime.now() - timedelta(days=1)  
     start_date = end_date - timedelta(days=365)  
+
+    
     end_date_str = end_date.strftime('%Y-%m-%d')
     start_date_str = start_date.strftime('%Y-%m-%d')
     return render_template('index.html', start_date=start_date_str, end_date=end_date_str)
@@ -31,10 +33,19 @@ def results():
 
     cerebro = bt.Cerebro()
     start_cash = float(request.args.get('initial_cash', 100000))
+    
+    
+    size = int(request.args.get('size', 100))  
+    commission_rate = float(request.args.get('commission', 0.0005))  
+    print(f"Commission Rate: {commission_rate}")
 
     cerebro.broker.set_cash(start_cash)
 
-    data, success = get_a_stock(symbol, start_date, end_date)  
+  
+    cerebro.broker.setcommission(commission=commission_rate)
+    cerebro.addsizer(bt.sizers.FixedSize, stake=size)
+
+    data, success = get_a_stock(symbol, start_date, end_date)  #
     print("Data retrieval success:", success)
     if not success:
         return "Failed to fetch data for the provided dates.", 500
@@ -53,15 +64,15 @@ def results():
         strategy = strategies[0]  
         if hasattr(strategy, 'get_trade_data'):
             trade_data = strategy.get_trade_data()  
-            print("get trade_data:", trade_data)
+            print("trade data:", trade_data)
         else:
-            print("no trade_data")
+            print("no get_buy_sell_sign method")
             trade_data = []
     else:
-        print("no results")
+        print("no result")
         trade_data = []
 
-    final_value = cerebro.broker.getvalue()
+    final_value = round(cerebro.broker.getvalue(),2)
     candlestick_data = get_candlestick_data(data)
 
     return render_template('results.html', initial_cash=start_cash, final_value=final_value, 
@@ -76,15 +87,23 @@ def get_candlestick_data(datafeed):
         h = datafeed.high.array[i] 
         l = datafeed.low.array[i]
         c = datafeed.close.array[i]
+        v = datafeed.volume.array[i]
         ohlc.append({
             't': bt.num2date(date).strftime('%Y-%m-%d'),
-            'o': o,
-            'h': h,
-            'l': l,
-            'c': c
+            'o': round(o,2),
+            'h': round(h,2),
+            'l': round(l,2),
+            'c': round(c,2),
+            'v': v
         })
     return ohlc
 
+
+
+
 if __name__ == '__main__':
     app.run(debug=True)
+
+
+
 
