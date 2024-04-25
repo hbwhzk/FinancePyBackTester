@@ -5,11 +5,12 @@ class RSIStrategy(bt.Strategy):
         ('period', 14),
         ('rsi_low', 30),  
         ('rsi_high', 70),  
-        ('ticker', 'SH600519'),  
+
         ('printlog', True),  
     )
 
     def __init__(self):
+        self.symbol = self.datas[0]._name
         self.rsi = bt.indicators.RSI(self.data.close, period=self.params.period)
         self.buy_signal = bt.indicators.CrossDown(self.rsi, self.params.rsi_low)  
         self.sell_signal = bt.indicators.CrossOver(self.rsi, self.params.rsi_high)  
@@ -25,7 +26,7 @@ class RSIStrategy(bt.Strategy):
             self.trade_log.append({
                 'date': self.datas[0].datetime.date(0).isoformat(),
                 'type': order_type,
-                'symbol': self.params.ticker,
+                'symbol': self.symbol,
                 'price': round(order.executed.price, 2),
                 'size': order.executed.size,
                 'comm': round(order.executed.comm,2),

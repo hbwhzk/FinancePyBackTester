@@ -3,12 +3,12 @@ import backtrader as bt
 class SMACrossStrategy(bt.Strategy):
     params = (
         ('short_period', 10),  
-        ('long_period', 30),   
-        ('ticker', 'SH600519'),  
+        ('long_period', 30),     
         ('printlog', True),  
     )
 
     def __init__(self):
+        self.symbol = self.datas[0]._name 
         self.sma_short = bt.indicators.SMA(self.data.close, period=self.params.short_period)
         self.sma_long = bt.indicators.SMA(self.data.close, period=self.params.long_period)
         self.crossover = bt.indicators.CrossOver(self.sma_short, self.sma_long)
@@ -46,7 +46,7 @@ class SMACrossStrategy(bt.Strategy):
             self.trade_log.append({
                 'date': self.datas[0].datetime.date(0).isoformat(),
                 'type': order_type,
-                'symbol': self.params.ticker,
+                'symbol': self.symbol,
                 'price': round(order.executed.price, 2),
                 'size': order.executed.size,
                 'comm': round(order.executed.comm,2),
@@ -69,18 +69,3 @@ class SMACrossStrategy(bt.Strategy):
         """
         print("交易记录：", self.trade_log)
         return self.trade_log
-
-
-
-
-# if __name__ == "__main__":
-#     cerebro = bt.Cerebro()
-#     data = get_a_stock('SZ000002', '2023-10-01', '2024-10-10')
-#     if data is not None:
-#         cerebro.adddata(data)
-#         cerebro.addstrategy(SMACrossStrategy)
-#         print("Starting Portfolio Value: %.2f" % cerebro.broker.getvalue())
-#         cerebro.run()
-#         print("Final Portfolio Value: %.2f" % cerebro.broker.getvalue())
-#     else:
-#         print("Failed to fetch data.")

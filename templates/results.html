@@ -16,7 +16,8 @@
 <body>
 
     <div>
-      <h2>Trading Logging</h2>
+      <h1>Trading Logging</h1>
+      <h2>Stock Symbol: {{ symbol }}</h2>
       <table border="1">
           <thead>
               <tr>
@@ -32,7 +33,6 @@
                   <th>Cash</th>
                   <th>Stock value</th>
                   <th>Final Value</th>
-                  <th>Symbol</th>
               </tr>
           </thead>
             <tbody>
@@ -46,7 +46,7 @@
                   <td>{{ trade.cash }}</td>
                   <td>{{ trade.value }}</td>
                   <td>{{ trade.total }}</td>
-                  <td>{{ trade.symbol }}</td>
+
               </tr>
               {% endfor %}
           </tbody>

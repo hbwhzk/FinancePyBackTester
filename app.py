@@ -3,6 +3,7 @@ import backtrader as bt
 from strategies.get_a_stock import get_a_stock
 from strategies.rsi import RSIStrategy
 from strategies.sma import SMACrossStrategy
+from strategies.get_stock_from_yf import get_data_from_yahoo
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
@@ -23,6 +24,7 @@ def results():
     symbol = request.args.get('symbol')
     start_date = request.args.get('start_date')
     end_date = request.args.get('end_date')
+    data_source = request.args.get('data_source')
     strategy_name = request.args.get('strategy')
     param1 = int(request.args.get('param1', 14))  
     param2_str = request.args.get('param2', '30')  
@@ -45,8 +47,13 @@ def results():
     cerebro.broker.setcommission(commission=commission_rate)
     cerebro.addsizer(bt.sizers.FixedSize, stake=size)
 
-    data, success = get_a_stock(symbol, start_date, end_date)  #
-    print("Data retrieval success:", success)
+    if data_source == 'Yahoo Finance':
+        data, success = get_data_from_yahoo(symbol, start_date, end_date)# 获取数据
+        print("Data retrieval success from Yahoo Finance:", success)
+    else:
+        data, success =get_a_stock(symbol, start_date, end_date)
+        print("Data retrieval success:", success)
+    print("Symbol used in data retrieval:", symbol)    
     if not success:
         return "Failed to fetch data for the provided dates.", 500
 
@@ -76,7 +83,7 @@ def results():
     candlestick_data = get_candlestick_data(data)
 
     return render_template('results.html', initial_cash=start_cash, final_value=final_value, 
-                           results={'candlesticks': candlestick_data, 'trades': trade_data})
+                           results={'candlesticks': candlestick_data, 'trades': trade_data}, symbol=symbol)
 
 
 def get_candlestick_data(datafeed):
